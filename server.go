@@ -8,7 +8,7 @@ import (
 	"strconv"
 )
 
-type User struct{ Name string }
+type User struct{ Name string `json:"name"` }
 
 var users = make(map[int]User)
 
