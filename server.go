@@ -13,10 +13,19 @@ type User struct{ Name string }
 var users = make(map[int]User)
 
 func usersHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, fmt.Sprintf("Unsupported method: %s", r.Method), http.StatusMethodNotAllowed)
+		return
+	}
 	json.NewEncoder(w).Encode(users)
 }
 
 func userHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, fmt.Sprintf("Unsupported method: %s", r.Method), http.StatusMethodNotAllowed)
+		return
+	}
+
 	key := r.URL.Path[7:]
 	index, err := strconv.Atoi(key)
 	if err != nil {
