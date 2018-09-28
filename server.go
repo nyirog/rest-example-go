@@ -3,21 +3,53 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 )
 
-type User struct{ Name string `json:"name"` }
+type User struct {
+	Name string `json:"name"`
+}
 
 var users = make(map[int]User)
 
+var lock sync.Mutex
+
 func usersHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
+	if r.Method == http.MethodGet {
+		lock.Lock()
+		json.NewEncoder(w).Encode(users)
+		lock.Unlock()
+	} else if r.Method == http.MethodPost {
+		var user User
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Error reading body: %v", err)
+			http.Error(w, "Error during read body", http.StatusBadRequest)
+			return
+		}
+		if err := r.Body.Close(); err != nil {
+			log.Printf("Error during closing request: %v", err)
+			http.Error(w, "Error during read body", http.StatusBadRequest)
+			return
+		}
+
+		if err := json.Unmarshal(body, &user); err != nil {
+			log.Printf("Error during parsing request: %v", err)
+			w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+			http.Error(w, "Error during parsing body", http.StatusBadRequest)
+			return
+		}
+		lock.Lock()
+		index := len(users)
+		users[index] = user
+		lock.Unlock()
+	} else {
 		http.Error(w, fmt.Sprintf("Unsupported method: %s", r.Method), http.StatusMethodNotAllowed)
-		return
 	}
-	json.NewEncoder(w).Encode(users)
 }
 
 func userHandler(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +65,9 @@ func userHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Invalid user id: %s", key), http.StatusNotFound)
 		return
 	}
+	lock.Lock()
 	user, ok := users[index]
+	lock.Unlock()
 	if ok {
 		json.NewEncoder(w).Encode(user)
 	} else {
